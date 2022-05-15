@@ -1,6 +1,6 @@
 import cv2
 
-from src import transformation
+from src import transformation, parsing
 
 images_config = {
     1: {
@@ -72,8 +72,12 @@ if __name__ == '__main__':
     img_index = 3
     img_source_mask, img_source, pictures = read_data(index=img_index)
 
-    # transformation.test_perspective_transform(img_source_mask, images_config[img_index],
-    #                                           pictures, pic_index=0)
+    boxes = parsing.plot_create_boxes(img_source, img_source_mask, config=images_config[img_index])
 
-    transformation.test_affine_transform(img_source_mask, images_config[img_index],
-                                         pictures, pic_index=1)
+    # Пример с отрисовкой перспективы
+    transformation.test_perspective_transform(img_source_mask, images_config[img_index],
+                                              pictures, pic_index=0)
+
+    # Пример с отрисовкой афинного преобразования
+    # transformation.test_affine_transform(img_source_mask, images_config[img_index],
+    #                                      pictures, pic_index=1)

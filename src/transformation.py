@@ -160,7 +160,7 @@ def test_perspective_transform(img_source_mask, config, pictures, pic_index):
 
     tools.imshow(pic, tools.box_to_img(box), warped0, warped1, warped,
                  axes=[ax_picture, ax_box, ax_warped0, ax_warped1, ax_warped],
-                 titles=['Мазаика', 'Место под вставку',
+                 titles=['Мозаика', 'Место под вставку',
                          'Трансформация без ',
                          'Трансформация с добавлением',
                          'Трансформированное изображение'],
