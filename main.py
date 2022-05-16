@@ -1,6 +1,6 @@
 import cv2
 
-from src import transformation, parsing
+from src import transformation, parsing, inserting
 
 images_config = {
     1: {
@@ -72,12 +72,17 @@ if __name__ == '__main__':
     img_index = 3
     img_source_mask, img_source, pictures = read_data(index=img_index)
 
-    boxes = parsing.plot_create_boxes(img_source, img_source_mask, config=images_config[img_index])
+    # Построение рамок
+    boxes = parsing.plot_create_boxes(img_source, img_source_mask,
+                                      config=images_config[img_index], to_plot=False)
 
     # Пример с отрисовкой перспективы
     transformation.test_perspective_transform(img_source_mask, images_config[img_index],
-                                              pictures, pic_index=0)
+                                              pictures, pic_index=0, to_plot=False)
 
     # Пример с отрисовкой афинного преобразования
-    # transformation.test_affine_transform(img_source_mask, images_config[img_index],
-    #                                      pictures, pic_index=1)
+    transformation.test_affine_transform(img_source_mask, images_config[img_index],
+                                         pictures, pic_index=1, to_plot=False)
+
+    inserting.plot_inserting_pictures(img_source, img_source_mask, pictures, boxes,
+                                      config=images_config[img_index])

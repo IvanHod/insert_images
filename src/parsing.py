@@ -173,7 +173,7 @@ def find_lines_cv2(img_mask):
     return v_lines, h_lines, curves
 
 
-def plot_create_boxes(img, img_source_mask, config):
+def plot_create_boxes(img, img_source_mask, config, to_plot=False):
     green_mask = ((img_source_mask[:, :, 1] > 240) & (img_source_mask[:, :, 0] < 20)).astype('uint8') * 255
     max_row = np.where(green_mask.sum(axis=1) > 0)[0][-1]
 
@@ -194,6 +194,7 @@ def plot_create_boxes(img, img_source_mask, config):
                  img_out[: max_row, : 1000],
                  axes=[axes[0], axes[1]],
                  titles=['Размеченное изображение', 'Извлеченные рамки'],
-                 fig=fig)
+                 fig=fig, to_show=to_plot)
     fig.savefig('output/plots/boxes.png')
-    print(1)
+
+    return boxes

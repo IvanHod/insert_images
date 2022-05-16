@@ -127,7 +127,17 @@ def do_transform(pic: np.ndarray, box, kind: str, to_cut: bool = True,
     return warped_cut, warped, img_width_new
 
 
-def test_perspective_transform(img_source_mask, config, pictures, pic_index):
+def prepare_picture(pic, box, to_resize=True, linear=True):
+    pic_resized = to_resize_pic(pic, box) if to_resize else pic
+
+    transform_kind = 'linear' if linear else 'affine'
+    warped_cut, warped, img_width_new = do_transform(pic_resized, box, kind=transform_kind)
+
+    return warped_cut
+
+
+def test_perspective_transform(img_source_mask, config, pictures,
+                               pic_index, to_plot=False):
     from matplotlib import pyplot as plt
 
     fig = plt.figure(figsize=(16, 8))
@@ -160,16 +170,16 @@ def test_perspective_transform(img_source_mask, config, pictures, pic_index):
 
     tools.imshow(pic, tools.box_to_img(box), warped0, warped1, warped,
                  axes=[ax_picture, ax_box, ax_warped0, ax_warped1, ax_warped],
-                 titles=['Мозаика', 'Место под вставку',
-                         'Трансформация без ',
-                         'Трансформация с добавлением',
-                         'Трансформированное изображение'],
-                 fig=fig)
+                 titles=['Мозаика', 'Место под вставку с перспективой',
+                         'Обычная трансформация',
+                         'Трансформация с "запасом"',
+                         'Итог при перспективе'],
+                 fig=fig, to_show=to_plot)
     fig.savefig('output/plots/perspective.png')
-    print(1)
 
 
-def test_affine_transform(img_source_mask, config, pictures, pic_index):
+def test_affine_transform(img_source_mask, config, pictures, pic_index,
+                          to_plot=False):
     from matplotlib import pyplot as plt
 
     fig = plt.figure(figsize=(16, 8))
@@ -194,10 +204,9 @@ def test_affine_transform(img_source_mask, config, pictures, pic_index):
 
     tools.imshow(pic, tools.box_to_img(box), warped0, warped, warped_cut,
                  axes=[ax_picture, ax_box, ax_warped0, ax_warped, ax_warped_cut],
-                 titles=['Мазаика', 'Место под вставку',
-                         'Трансформация',
-                         'Трансформация с учетом',
-                         'Трансформированное изображение'],
-                 fig=fig)
+                 titles=['Мозаика', 'Деформированное место под вставку',
+                         'Обычная трансформация',
+                         'Трансформация с "запасом"',
+                         'Итог при аффинном преобразовании'],
+                 fig=fig, to_show=to_plot)
     fig.savefig('output/plots/affine.png')
-    print(1)

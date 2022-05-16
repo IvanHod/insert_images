@@ -3,7 +3,7 @@ from cv2 import cv2
 from matplotlib import pyplot as plt
 
 
-def imshow(*args, axes=None, titles=None, fig=None):
+def imshow(*args, axes=None, titles=None, fig=None, to_show=False):
     img_len = len(args)
     if axes is None:
         fig, axes = plt.subplots(1, img_len, figsize=(16, 8))
@@ -28,6 +28,8 @@ def imshow(*args, axes=None, titles=None, fig=None):
 
     if fig is not None:
         fig.tight_layout()
+
+    if to_show:
         fig.show()
 
 
@@ -50,17 +52,20 @@ def box_to_img(box):
     right_full = np.hstack((np.repeat(right.max(), max(box['right'][0, 0] - top.min() - 1, 0)), right,
                             np.repeat(right.max(), max(bottom.max() - box['right'][-1, 0] - 1, 0))))
 
-    top_full = np.hstack((np.repeat(0, max(box['top'][0, 1] - left.min() - 1, 0)),
+    top_full = np.hstack((np.repeat(0, max(box['top'][0, 1] - left.min(), 0)),
                           top,
-                          np.repeat(0, max(right.max() - box['top'][-1, 1] - 1, 0))))
+                          np.repeat(0, max(right.max() - box['top'][-1, 1], 0))))
 
-    bottom_full = np.hstack((np.repeat(bottom.max(), max(box['bottom'][0, 1] - left.min() - 1, 0)),
+    bottom_full = np.hstack((np.repeat(bottom.max(), max(box['bottom'][0, 1] - left.min(), 0)),
                              bottom,
-                             np.repeat(bottom.max(), max(right.max() - box['bottom'][-1, 1] - 1, 0))))
+                             np.repeat(bottom.max(), max(right.max() - box['bottom'][-1, 1], 0))))
+
+    assert top_full.size == bottom_full.size, 'Must be equal'
+    assert left_full.size == right_full.size, 'Must be equal'
 
     # x - rows, y - cols
-    x, y = np.arange(bottom.max() - top.min()) + top.min(),\
-           np.arange(right.max() - left.min()) + left.min()
+    x, y = np.arange(left_full.size) + top.min(),\
+           np.arange(top_full.size) + left.min()
     xx, yy = np.meshgrid(y, x)
 
     indices = (yy >= top_full) & (yy <= bottom_full) &\
