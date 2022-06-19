@@ -30,6 +30,15 @@ def to_resize_pic(pic, box):
 
 
 def matrix_for_perspective_transform(pic, box: dict, shift: tuple, delta=60, axes=None):
+    """
+
+    :param pic: Входное изображение
+    :param box: Рамка для вставки
+    :param shift: Смещение рамки относительно большого изображения
+    :param delta:
+    :param axes:
+    :return:
+    """
     h, w, _ = pic.shape
     width_max = box['top'][-1, 1] - box['top'][0, 1]
     shift_left = int((width_max - w) / 2)
@@ -98,13 +107,14 @@ def affine_transform(pic, curve_top, curve_bottom, dsize):
 
 
 def do_transform(pic: np.ndarray, box, kind: str, to_cut: bool = True,
-                 offset_row=40, offset_col=80, table_axes=None):
+                 offset_row=100, offset_col=200, table_axes=None):
     assert kind in {'linear', 'affine'}, 'kind must be "linear" or "affine"'
 
     shift = (box['left'][:, 0].min(), box['left'][:, 1].min())
 
     if kind == 'linear':
         M, pic_in, img_width_new = matrix_for_perspective_transform(pic, box=box, shift=shift,
+                                                                    delta=min(offset_row, offset_col),
                                                                     axes=table_axes)
         warped = cv2.warpPerspective(pic_in, M, dsize=(pic_in.shape[1] + offset_row,
                                                        pic_in.shape[0] + offset_col))

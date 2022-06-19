@@ -1,3 +1,5 @@
+from typing import Tuple
+
 import numpy as np
 from cv2 import cv2
 from matplotlib import pyplot as plt
@@ -20,7 +22,7 @@ def _insert_pic(img, pic, shift_outside, shift_inside: int, config: dict, img_in
     h, w, _ = pic.shape
     shift = shift_outside + np.array([0, shift_inside])
 
-    # mask to exclude of pixels of picture by mask
+    # mask to exclude the pixels of picture
     red_mask = (img_source_mask[:, :, 2] > 240) & (img_source_mask[:, :, 0] < 10)
     red_mask_path = red_mask[shift[0]: shift[0] + h, shift[1]: shift[1] + w]
     mask = ~calc_mask(pic, red_mask_path)
@@ -87,7 +89,7 @@ def insert_right_pic(img, img_source_mask, pic, box, config, smooth_count=10):
         pic = pic[:, :int(pic_w * (box_w / box_h))]
 
     return insert_pic(img, pic, box, config=config, to_resize=True, linear=True,
-                      smooth_count=smooth_count)
+                      smooth_count=smooth_count, img_source_mask=img_source_mask)
 
 
 def insert_pictures_into_frame(frame, frame_mask, pictures, boxes, config, smooth_count=10):
@@ -115,8 +117,47 @@ def insert_pictures_into_frame(frame, frame_mask, pictures, boxes, config, smoot
     return img_work
 
 
-def insert_pictures_into_video(img_source_mask, images_config, index: int, stop_frame=None):
-    boxes = parsing.create_boxes(img_source_mask, config=images_config[index])
+def cross_correlation(frame1, frame2, shift=10):
+    f1, f2 = frame1, frame2
+    res = []
+    bix_in = slice(shift, -shift)
+    for row in range(-shift, shift, 1):
+        # for col in range(-shift, shift, 1):
+        f_rolled = np.roll(f2, shift=row, axis=0)  # by row
+        coef = np.mean(np.abs(f1[bix_in, bix_in].mean(axis=2)
+                              - f_rolled[bix_in, bix_in].mean(axis=2)), axis=None)
+        res.append([row, 0, coef])
+
+    res = sorted(res, key=lambda v: v[-1])
+    offset_row, offset_col, coef = res[0][0], res[0][1], res[0][-1]
+    return (offset_row, offset_col), coef
+
+
+def write_video(frames: list, path: str, sizes: Tuple[int, int] = None):
+    if not frames:
+        raise Exception('The frames are empty')
+
+    print(f'Output shape: {frames[0].shape}')
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    h, w, _ = frames[0].shape
+    if sizes:
+        w, h = sizes
+
+    out = cv2.VideoWriter(path, fourcc, 20.0, (w, h))
+
+    for i in range(len(frames)):
+        frame = frames[i]
+        if sizes:
+            frame = frame[:h, :w]
+
+        out.write(frame)
+
+    out.release()
+
+
+def insert_pictures_into_video(frame_mask, pictures, config,
+                               index: int, stop_frame=None):
+    boxes = parsing.create_boxes(frame_mask, config=config)
 
     filename = f'video-{index}'
     vidcap = cv2.VideoCapture(f'data/{filename}.MOV')
@@ -124,31 +165,97 @@ def insert_pictures_into_video(img_source_mask, images_config, index: int, stop_
     frames = []
     success, iteration = True, 0
     while success:
-        print(f'Iteration {iteration}')
+        if iteration % 10 == 0:
+            print(f'Iteration {iteration}')
         success, frame = vidcap.read()
         if not success:
             break
 
-        try:
-            frame_out = insert_pictures_into_frame(frame, boxes, images_config, index=index)
+        frame_out = insert_pictures_into_frame(frame, frame_mask, pictures, boxes,
+                                               config=config, smooth_count=2)
 
-            frames.append(frame_out)
-
-        except Exception as e:
-            print('error', e)
-            break
+        frames.append(frame_out)
 
         iteration += 1
         if stop_frame is not None and iteration > stop_frame:
             break
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    h, w, _ = frames[0].shape
-    out = cv2.VideoWriter(f'data/out/{filename}.mov', fourcc, 20.0, (w, h))
+    write_video(frames, f'output/video/{filename}.mov')
 
-    for i in range(len(frames)):
-        out.write(frames[i])
-    out.release()
+
+def shift_frame(frame, offset_row):
+    if (offset_row := round(offset_row)) != 0:
+        frame = np.roll(frame, offset_row, axis=0)
+        if offset_row > 0:
+            frame[:offset_row] = (0, 0, 0)
+        else:
+            frame[offset_row:] = (0, 0, 0)
+
+    return frame
+
+
+def insert_pictures_into_video_shift(frame_mask, pictures, config,
+                                          index: int, stop_frame=None, to_corr=False):
+    boxes = parsing.create_boxes(frame_mask, config=config)
+
+    filename = f'video-{index}'
+    vidcap = cv2.VideoCapture(f'data/{filename}.MOV')
+
+    frames, first_frame = [], None
+    v_line = None
+    success, iteration = True, 0
+    while success:
+        if iteration % 10 == 0:
+            print(f'Iteration {iteration}')
+        success, frame = vidcap.read()
+        if not success:
+            break
+
+        frame_out = insert_pictures_into_frame(frame, frame_mask, pictures, boxes,
+                                               config=config, smooth_count=2)
+
+        frame_rolled1 = frame.copy() if to_corr else None
+        frame_rolled2 = frame.copy() if to_corr else None
+
+        if iteration == 0:
+            first_frame = frame
+            v_line = np.zeros((frame.shape[0], 2, 3), dtype='uint8')  # vertical line
+        elif to_corr:
+            rows, cols = slice(100, 400), slice(800, 1000)
+            offset1, coef1 = cv2.phaseCorrelate(first_frame[rows, cols].mean(axis=2),
+                                                frame[rows, cols].mean(axis=2))
+
+            offset2, coef2 = cross_correlation(first_frame[rows, cols],
+                                               frame[rows, cols], shift=10)
+
+            print(offset1, round(coef2, 2), '|', offset2, coef2)
+            frame_rolled1 = shift_frame(frame, offset_row=offset1[0])
+            frame_rolled2 = shift_frame(frame, offset_row=offset2[0])
+
+        if to_corr:
+            frame_rolled_out1 = insert_pictures_into_frame(frame_rolled1, frame_mask, pictures,
+                                                           boxes, config=config, smooth_count=2)
+
+            frame_rolled_out2 = insert_pictures_into_frame(frame_rolled2, frame_mask, pictures,
+                                                           boxes, config=config, smooth_count=2)
+
+            w_size = frame.shape[1] // 3
+            frame_out_merged = np.hstack((
+                frame_out[:, :w_size - 1],
+                v_line,
+                frame_rolled_out1[:, w_size + 1: w_size * 2 - 1],
+                v_line,
+                frame_rolled_out2[:, w_size * 2 + 1:],
+            ))
+            frames.append(frame_out_merged)
+        else:
+            frames.append(frame)
+
+        iteration += 1
+        if stop_frame is not None and iteration > stop_frame:
+            break
+
+    write_video(frames, f'output/video_shifted/{filename}.mov', sizes=(1600, 400))
 
 
 def plot_inserting_pictures(frame, frame_mask, pictures, boxes, config):
@@ -174,3 +281,14 @@ def plot_inserting_pictures(frame, frame_mask, pictures, boxes, config):
                  fig=fig)
     fig.savefig('output/plots/inserting.png')
     print(1)
+
+
+def plot_inserting_final(frame, frame_mask, pictures, boxes, config, to_plot=False):
+    img_out = insert_pictures_into_frame(frame, frame_mask, pictures, boxes=boxes,
+                                         config=config, smooth_count=2)
+
+    fig0, ax0 = plt.subplots(1, 1, figsize=(5, 3))
+    if to_plot:
+        tools.imshow(img_out[:400], axes=[ax0], titles=['Проблема темных пикселей'],
+                     fig=fig0, to_show=True)
+    fig0.savefig('output/plots/final_frame.png')

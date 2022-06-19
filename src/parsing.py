@@ -110,16 +110,23 @@ def create_middle_boxes(lines_v, curves):
 
 def create_boxes(img_source_mask, config: dict):
     lines_v, lines_h, curves = find_lines_cv2(img_source_mask)
-
-    left_box = create_left_box(lines_v[:2], lines_h) if config['left'] else None
+    left_box, right_box = None, None
+    if config['left']:
+        left_box = create_left_box(lines_v[:2], lines_h[:2])
 
     middle_index = 2 if config['left'] else 0
     middle_index_end = len(lines_v) - (config['right'] * 2 - config['right-path'])  # 7 центральных рамок
-    print(middle_index, middle_index_end, len(lines_v))
+
+    # todo костыль, когда слева лишь малый кусочек изображения
+    if config['right-path'] and len(lines_v[middle_index: middle_index_end]) % 2 == 1:
+        middle_index += 1
+
     middle_boxes = create_middle_boxes(lines_v[middle_index: middle_index_end], curves)
 
-    right_index = 1 if config['right-path'] else 2
-    right_box = create_right_box(lines_v[-right_index:], lines_h) if config['right'] else None
+    # todo костыль пока, чтобы не вставлять правое изображение, если его лишь кусочек
+    if config['right'] and not config['right-path']:
+        right_index = 1 if config['right-path'] else 2
+        right_box = create_right_box(lines_v[-right_index:], lines_h[2:])
 
     return {'left': left_box, 'middle': middle_boxes, 'right': right_box}
 
@@ -164,6 +171,8 @@ def find_lines_cv2(img_mask):
 
     # plt.imshow(blue_mask)
     # plt.show()
+
+    h_lines = sorted(h_lines, key=lambda l: l[0, 1])  # sort by column, left to right
 
     curves = sorted(curves, key=lambda c: c[0, 0])  # sort by row
     curves = {'top': curves[0], 'bottom': curves[1]}
