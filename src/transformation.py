@@ -1,8 +1,9 @@
 import numpy as np
-from cv2 import cv2
+import cv2
 from skimage import transform, util
 
 from src import tools, parsing
+from src.definitions import Point, Box, Polygon
 
 
 def smooth_line(img_path, pic, line: np.ndarray, step: np.ndarray, coefs_save: list):
@@ -80,6 +81,7 @@ def affine_transform(pic, curve_top, curve_bottom, dsize):
         curve_bottom = np.vstack((curve_bottom, curve_bottom[-(width_max - curve_bottom.shape[0]):]))
 
     start_point = int((width_max - width) / 2)
+    start_point = max(start_point, 0)  # todo
     end_point = start_point + width
 
     cols = np.repeat(np.arange(width), 2)
@@ -186,6 +188,98 @@ def test_perspective_transform(img_source_mask, config, pictures,
                          'Итог при перспективе'],
                  fig=fig, to_show=to_plot)
     fig.savefig('output/plots/perspective.png')
+
+
+def test_perspective_transform_synthetic(picture, to_plot=False):
+    from matplotlib import pyplot as plt
+
+    dst = Box(
+        Point(30, 30),
+        Point(0, 400),
+        Point(220, 370),
+        Point(250, 0),
+    )
+
+    dsize = (400, 250)  # width, height
+    pic = cv2.resize(picture, dsize)
+
+    h_in, w_in = pic.shape[0], pic.shape[1]
+
+    src = np.array([[0, 0], [0, w_in], [h_in, w_in], [h_in, 0]], dtype='float32')
+    M = cv2.getPerspectiveTransform(src[:, [1, 0]], dst.points[:, [1, 0]])
+
+    warped = cv2.warpPerspective(pic, M=M, dsize=dsize)
+
+    fig = plt.figure(figsize=(16, 8))
+    grid = plt.GridSpec(2, 3, wspace=0.4, hspace=0.3)
+
+    ax_tl = fig.add_subplot(grid[0, 0])
+    ax_bl = fig.add_subplot(grid[1, 0])
+    ax_right = fig.add_subplot(grid[:, 1:])
+
+    tools.imshow(pic, tools.box_obj_to_img(dst), warped,
+                 axes=[ax_tl, ax_bl, ax_right],
+                 titles=['Исходное изображение', 'Рамка под вставку', 'Выходное изображение'],
+                 fig=fig,
+                 to_show=to_plot)
+    fig.savefig('output/plots/perspective_synthetic.png')
+
+
+def test_affine_transform_synthetic(picture, to_plot=False):
+    # shape of out img is (250, 400)
+    from matplotlib import pyplot as plt
+
+    dsize = (400, 250)  # width, height
+    pic = cv2.resize(picture, dsize)
+
+    curve_top_rows = 20 - np.round(np.arange(0, 400) ** 0.5)  # [0..20] by [0..400]
+    func_cols = lambda rows: np.round((250 - rows) / 24.7)
+
+    rows_vertical = np.arange(0, 250, 1)  # [0..250]
+
+    fig = plt.figure(figsize=(16, 8))
+
+    # generate box using exists functions, so translate it all lines and curves
+    # to find intersections
+    box = parsing.create_middle_boxes(lines_v=[
+        np.vstack([rows_vertical, func_cols(rows_vertical)]).T,
+        np.vstack([rows_vertical, func_cols(rows_vertical)]).T + np.array([0, 389])
+    ], curves={
+        'top': np.vstack([curve_top_rows, np.arange(0, 400)]).T,
+        'bottom': np.vstack([curve_top_rows, np.arange(0, 400)]).T + np.array([229, 0])
+    })[0]
+
+    box = Polygon(box['left'], box['top'], box['right'], box['bottom'])
+
+    src = np.vstack((
+        np.vstack((np.zeros(box.top.shape[0]), box.top[:, 1])).T,  # top
+        np.vstack((np.ones(box.bottom.shape[0]) * box.height, box.bottom[:, 1])).T,  # bottom
+    )).astype('int')
+    dst = np.vstack((box.top, box.bottom)).astype('int')
+
+    tform = transform.PiecewiseAffineTransform()
+    tform.estimate(src[:, [1, 0]], dst[:, [1, 0]])
+
+    out_h, out_w, _ = pic.shape
+    warped = transform.warp(pic, tform.inverse, clip=False, order=1,
+                            mode='constant', cval=0,
+                            output_shape=(box.height, box.width))
+    warped = (warped * 255).astype('uint8')
+
+    fig = plt.figure(figsize=(16, 8))
+    grid = plt.GridSpec(2, 3, wspace=0.4, hspace=0.3)
+
+    ax_tl = fig.add_subplot(grid[0, 0])
+    ax_bl = fig.add_subplot(grid[1, 0])
+    ax_right = fig.add_subplot(grid[:, 1:])
+
+    tools.imshow(pic, tools.box_to_img(box), warped,
+                 axes=[ax_tl, ax_bl, ax_right],
+                 titles=['Исходное изображение', 'Рамка под вставку', 'Выходное изображение'],
+                 fig=fig,
+                 to_show=to_plot)
+
+    fig.savefig('output/plots/affine_synthetic.png')
 
 
 def test_affine_transform(img_source_mask, config, pictures, pic_index,

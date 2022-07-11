@@ -69,7 +69,7 @@ def read_data(index: int):
 
 
 if __name__ == '__main__':
-    img_index = 4
+    img_index = 3
     img_source_mask, img_source, pictures = read_data(index=img_index)
 
     config = images_config[img_index]
@@ -78,22 +78,28 @@ if __name__ == '__main__':
     boxes = parsing.plot_create_boxes(img_source, img_source_mask,
                                       config=config, to_plot=False)
 
-    # Пример с отрисовкой перспективы
+    # # Пример с отрисовкой перспективы
     # transformation.test_perspective_transform(img_source_mask, config,
     #                                           pictures, pic_index=0, to_plot=False)
-    #
+
+    # # Отрисовка перспективы синтаксическая
+    # transformation.test_perspective_transform_synthetic(pictures[0], to_plot=True)
+
     # # Пример с отрисовкой афинного преобразования
     # transformation.test_affine_transform(img_source_mask, config,
     #                                      pictures, pic_index=1, to_plot=False)
 
+    # # Пример с отрисовкой афинного преобразования [синтаксическая]
+    # transformation.test_affine_transform_synthetic(pictures[1], to_plot=False)
+
     # Отрисовка конкретного вида библиотки (1-5), для демонстрации вставки изображений
-    # inserting.plot_inserting_pictures(img_source, img_source_mask, pictures, boxes,
-    #                                   config=config)
+    inserting.plot_inserting_pictures(img_source, img_source_mask, pictures, boxes,
+                                      config=config)
 
     # Отрисовка вставки последнего фрейма
     # inserting.plot_inserting_final(img_source, img_source_mask,
     #                                pictures, boxes, config=config, to_plot=True)
 
-    inserting.insert_pictures_into_video(img_source_mask, pictures, config, index=img_index,
-                                         stop_frame=None)
+    inserting.insert_pictures_into_video_shift(img_source_mask, pictures, config, index=img_index,
+                                               stop_frame=None)
     print(1)

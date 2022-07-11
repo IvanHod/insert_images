@@ -3,13 +3,7 @@ from dataclasses import dataclass
 from PIL import Image
 import cv2
 
-
-@dataclass
-class Border:
-    top = 0
-    right: int
-    left = 0
-    bottom: int
+from src.definitions import Border
 
 
 @dataclass

@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from cv2 import cv2
+import cv2
 from sklearn.linear_model import LinearRegression
 
 from src import tools

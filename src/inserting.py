@@ -1,11 +1,13 @@
 from typing import Tuple
 
 import numpy as np
-from cv2 import cv2
+import cv2
 from matplotlib import pyplot as plt
 
 from src import transformation, parsing, tools
 from skimage import util
+
+from src.definitions import Border
 
 
 def calc_mask(pic, red_mask):
@@ -195,7 +197,7 @@ def shift_frame(frame, offset_row):
 
 
 def insert_pictures_into_video_shift(frame_mask, pictures, config,
-                                          index: int, stop_frame=None, to_corr=False):
+                                     index: int, stop_frame=None, to_corr=True):
     boxes = parsing.create_boxes(frame_mask, config=config)
 
     filename = f'video-{index}'
@@ -241,11 +243,11 @@ def insert_pictures_into_video_shift(frame_mask, pictures, config,
 
             w_size = frame.shape[1] // 3
             frame_out_merged = np.hstack((
-                frame_out[:, :w_size - 1],
-                v_line,
-                frame_rolled_out1[:, w_size + 1: w_size * 2 - 1],
-                v_line,
-                frame_rolled_out2[:, w_size * 2 + 1:],
+                frame_out[:400, :449],
+                v_line[:400],
+                frame_rolled_out1[:400, 451: 899],
+                v_line[:400],
+                frame_rolled_out2[:400, 901:1600],
             ))
             frames.append(frame_out_merged)
         else:
@@ -258,7 +260,7 @@ def insert_pictures_into_video_shift(frame_mask, pictures, config,
     write_video(frames, f'output/video_shifted/{filename}.mov', sizes=(1600, 400))
 
 
-def plot_inserting_pictures(frame, frame_mask, pictures, boxes, config):
+def plot_inserting_pictures(frame, frame_mask, pictures, boxes, config, to_show=False):
     img_out_1 = insert_pictures_into_frame(frame, frame_mask, pictures, boxes=boxes,
                                            config=config, smooth_count=0)
 
@@ -272,13 +274,14 @@ def plot_inserting_pictures(frame, frame_mask, pictures, boxes, config):
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
 
-    border_right, border_bottom = 700, 500
-    tools.imshow(img_out_1[:border_bottom, :border_right],
-                 img_out_10[:border_bottom, :border_right],
+    border = Border(right=350, bottom=390, top=200, left=120)
+    tools.imshow(img_out_1[border.slices],
+                 img_out_10[border.slices],
                  axes=list(axes),
                  titles=['Без сглаживания',
                          'Сглаживание с коэффициентом равным десяти'],
-                 fig=fig)
+                 fig=fig,
+                 to_show=to_show)
     fig.savefig('output/plots/inserting.png')
     print(1)
 
